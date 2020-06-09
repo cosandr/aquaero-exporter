@@ -9,7 +9,7 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
 fi
 
 OPTIONS=h
-LONGOPTS=help,pkg-name:,host:,port:,bin-path:,systemd-path:,py-path:
+LONGOPTS=help,pkg-name:,host:,port:,bin-path:,systemd-path:,py-path:,write-file:
 
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -25,6 +25,7 @@ BIN_PATH="$(pwd -P)/aquaero_exporter/exporter.py"
 SYSTEMD_PATH="/usr/lib/systemd/system"
 LISTEN_HOST="0.0.0.0"
 LISTEN_PORT="2782"
+WRITE_FILE=""
 
 if [[ -d $PYENV_ROOT/versions/$PKG_NAME/bin ]]; then
     PY_PATH="$PYENV_ROOT/versions/$PKG_NAME/bin/python"
@@ -49,6 +50,7 @@ Options:
       --bin-path        Path where the script is installed (default $BIN_PATH)
       --systemd-path    Path where systemd units are installed (default $SYSTEMD_PATH)
       --py-path         Path to interpreter (default $PY_PATH)
+      --write-file      Write latest status to a script-friendly file (default disabled)
 END
 }
 
@@ -82,6 +84,10 @@ while true; do
             PY_PATH="$2"
             shift 2
             ;;
+        --write-file)
+            WRITE_FILE="$2"
+            shift 2
+            ;;
         --)
             shift
             break
@@ -107,6 +113,9 @@ case "$1" in
             exit 1
         fi
         echo -e "\n########## Systemd service ##########\n"
+        if [[ -n $WRITE_FILE ]]; then
+            WRITE_FILE="--file $WRITE_FILE"
+        fi
         cat <<EOF | tee "$SERVICE_FILE"
 [Unit]
 Description=$PKG_NAME service
@@ -117,7 +126,7 @@ After=network-online.target
 Type=simple
 # Don't start if we can't find any aquaero devices
 ExecStartPre=sh -c "set -o pipefail; lsusb | grep '0c70:f001'"
-ExecStart=$PY_PATH $BIN_PATH --host $LISTEN_HOST --port $LISTEN_PORT
+ExecStart=$PY_PATH $BIN_PATH --host $LISTEN_HOST --port $LISTEN_PORT $WRITE_FILE
 Restart=always
 NoNewPrivileges=true
 ProtectHome=read-only

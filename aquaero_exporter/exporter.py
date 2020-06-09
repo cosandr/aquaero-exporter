@@ -17,6 +17,9 @@ def timeit(func):
     return timed
 
 
+WRITE_FILE = ''
+
+
 class Status(NamedTuple):
     id: str
     val: float
@@ -35,7 +38,6 @@ class Exporter:
         self.aq.close()
         print('Aquaero device closed')
 
-    @timeit
     def read_status_aquaero(self) -> dict:
         return self.aq.get_status()
 
@@ -75,14 +77,29 @@ class Exporter:
     async def handler_metrics(self, r: web.Request) -> web.Response:
         status = self.parse_status(self.read_status_aquaero())
         self.update_gauges(status)
+        if WRITE_FILE:
+            try:
+                write_str = ''
+                for s_list in status.values():
+                    tmp = [f'{s.id}\t{s.val}' for s in s_list]
+                    write_str += f'{"|".join(tmp)}\n'
+                with open(WRITE_FILE, 'w') as f:
+                    f.write(write_str.strip())
+            except Exception as e:
+                print(f'Cannot write to {WRITE_FILE}: {e}')
         return web.Response(body=prom.generate_latest(prom.REGISTRY), content_type="text/plain")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Prometheus exporter for Aquaero devices")
-    parser.add_argument('--host', type=str, help='Listen address host', default='0.0.0.0')
-    parser.add_argument('--port', type=int, help='Listen address port', default=2782)
+    parser.add_argument('--host', type=str, default='0.0.0.0', help='Listen address host')
+    parser.add_argument('--port', type=int, default=2782, help='Listen address port')
+    parser.add_argument('--file', type=str, help='Write script-friendly output to file')
     args = parser.parse_args()
+    if args.file:
+        global WRITE_FILE
+        WRITE_FILE = args.file
+        print(f'Write status to {WRITE_FILE}')
     exp = Exporter()
     app = web.Application()
     app.add_routes([web.get("/metrics", exp.handler_metrics)])
