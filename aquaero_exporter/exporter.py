@@ -1,21 +1,10 @@
 import argparse
-from time import perf_counter
+import os
 from typing import Dict, NamedTuple, List
 
 import prometheus_client as prom
 from aiohttp import web
 from pyquaero.core import Aquaero
-
-
-def timeit(func):
-    def timed(*args, **kwargs):
-        ts = perf_counter()
-        res = func(*args, **kwargs)
-        te = perf_counter()
-        print(f'{func.__name__} ran in {(te-ts)*1000:.2f}ms')
-        return res
-    return timed
-
 
 WRITE_FILE = ''
 
@@ -52,18 +41,19 @@ class Exporter:
                     if not isinstance(fan, dict):
                         print(f'Expected type dict for fan entry, got {type(fan)}')
                         break
-                    if fan.get('speed'):
+                    if fan.get('speed') is not None:
                         res['aquaero_rpm'].append(Status(id=f'fan{i}', val=fan['speed']))
             if k == 'temperatures':
                 if not isinstance(v, dict):
                     print(f'Expected type dict for temperatures, got {type(v)}')
                     continue
-                for i, sensor in enumerate(v.get('sensor'), 1):
-                    if not isinstance(v, dict):
-                        print(f'Expected type dict for sensor, got {type(sensor)}')
-                        break
-                    if sensor.get('temp'):
-                        res['aquaero_temp'].append(Status(id=f'sensor{i}', val=sensor['temp']))
+                for name, entries in v.items():
+                    for i, sensor in enumerate(entries, 1):
+                        if not isinstance(sensor, dict):
+                            print(f'Expected type dict for {name}, got {type(sensor)}')
+                            break
+                        if sensor.get('temp') is not None:
+                            res['aquaero_temp'].append(Status(id=f'{name}{i}', val=sensor['temp']))
         return res
 
     def update_gauges(self, status: Dict[str, List[Status]]):
