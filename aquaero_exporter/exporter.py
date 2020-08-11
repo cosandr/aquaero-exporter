@@ -19,9 +19,11 @@ class Exporter:
         self.aq = Aquaero()
         print('Aquaero device opened')
         self.gauges: Dict[str, prom.Gauge] = {
+            "aquaero_up": prom.Gauge("aquaero_up", "Aquaero exporter running"),
             "aquaero_rpm": prom.Gauge("aquaero_rpm", "Aquaero fan RPM", ['id']),
             "aquaero_temp": prom.Gauge("aquaero_temp", "Aquaero temperature sensor", ['id']),
         }
+        self.gauges["aquaero_up"].set(1)
 
     def close(self):
         self.aq.close()

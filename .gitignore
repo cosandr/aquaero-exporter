@@ -1,4 +1,7 @@
+__pycache__
+.py[co]
 .venv
 .idea
+.vscode
 *.pickle
 build
