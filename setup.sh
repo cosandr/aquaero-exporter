@@ -9,7 +9,7 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
 fi
 
 OPTIONS=h
-LONGOPTS=help,pkg-name:,listen-address:,systemd-path:,exec-cmd:
+LONGOPTS=help,pkg-name:,listen-address:,systemd-path:,exec-cmd:,quadro
 
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -52,6 +52,7 @@ Options:
       --exec-cmd        Override systemd exec (default $EXEC_CMD)
       --listen-address  Listen address (default $LISTEN_ADDRESS)
       --pkg-name        Change package name (default $PKG_NAME)
+      --quadro          Use Quadro device
       --systemd-path    Path where systemd units are installed (default $SYSTEMD_PATH)
 END
 }
@@ -73,6 +74,11 @@ while true; do
         --pkg-name)
             PKG_NAME="$2"
             shift 2
+            ;;
+        --quadro)
+            DEVICE_ID="0c70:f00d"
+            EXTRA_ARGS="--quadro"
+            shift
             ;;
         --systemd-path)
             SYSTEMD_PATH="$2"

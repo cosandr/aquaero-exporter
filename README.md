@@ -1,6 +1,7 @@
 # Prometheus exporter for Aquaero devices
 
-This is a simple metrics exporter using the [pyquaero](https://github.com/shred/pyquaero) library.
+This is a simple metrics exporter using my
+[pyquaero](https://github.com/cosandr/pyquaero/tree/quadro) fork with Quadro support.
 It only exports fan speeds and temperatures, but it is easily expandable if desired.
 
 ## Installation
