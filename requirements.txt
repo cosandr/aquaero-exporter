@@ -1,3 +1,3 @@
-pyquaero
+git+https://github.com/cosandr/pyquaero.git@windows
 aiohttp
-prometheus_client 
+prometheus_client

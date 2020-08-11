@@ -1,19 +1,17 @@
 # Prometheus exporter for Aquaero devices
 
-This is a simple metrics exporter using the [pyquaero](https://github.com/shred/pyquaero) library.
+This is a simple metrics exporter using my
+[pyquaero](https://github.com/cosandr/pyquaero/tree/windows) fork for Windows.
 It only exports fan speeds and temperatures, but it is easily expandable if desired.
 
 ## Installation
 
-Arch users can use the PKGBUILD, but I prefer running it in a virtualenv.
+Use NSSM or task scheduler to run it all the time. NSSM with venv example:
 
-[setup.sh](./setup.sh) can generate a systemd service.
-
-If aquaero-exporter is installed in a virtualenv managed by pyenv, it will run that.
-Otherwise it will use the virtualenv interpreter to launch the script directly.
-If you don't have pyenv, it will run the script with the current interpreter.
-
-Generating a systemd unit file will fail if the script cannot start.
+```
+python setup.py install
+nssm.exe install AquaeroExporter "C:\Users\Andrei\venvs\aquaero-exporter\Scripts\aquaero_exporter.exe"
+```
 
 ## Example metrics
 
