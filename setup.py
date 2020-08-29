@@ -24,7 +24,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'aquaero_exporter=aquaero_exporter.exporter:main',
+            'aquaero-exporter=aquaero_exporter.exporter:main',
         ],
     },
 )
