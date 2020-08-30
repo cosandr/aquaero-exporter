@@ -84,8 +84,7 @@ class Exporter:
 
 def main():
     parser = argparse.ArgumentParser(description="Prometheus exporter for Aquaero devices")
-    parser.add_argument('--host', type=str, default='0.0.0.0', help='Listen address host')
-    parser.add_argument('--port', type=int, default=2782, help='Listen address port')
+    parser.add_argument('--listen-address', type=str, default='0.0.0.0:2782', help='Listen address')
     parser.add_argument('--file', type=str, help='Write script-friendly output to file')
     args = parser.parse_args()
     if args.file:
@@ -96,8 +95,8 @@ def main():
     app = web.Application()
     app.add_routes([web.get("/metrics", exp.handler_metrics)])
     try:
-        # Use port 2782 (AQUA)
-        web.run_app(app, host=args.host, port=args.port)
+        host, port = args.listen_address.split(':', 1)
+        web.run_app(app, host=host, port=int(port))
     finally:
         exp.close()
 
