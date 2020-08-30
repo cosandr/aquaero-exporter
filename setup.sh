@@ -132,11 +132,11 @@ Type=simple
 Environment=PYTHONUNBUFFERED=1
 # Don't start if we can't find any aquaero devices
 ExecStartPre=sh -c "set -o pipefail; lsusb | grep '0c70:f001'"
-ExecStart=$EXEC_CMD $EXTRA_ARGS --host $LISTEN_HOST --port $LISTEN_PORT $WRITE_FILE
+ExecStart=$EXEC_CMD --host $LISTEN_HOST --port $LISTEN_PORT $WRITE_FILE
 Restart=always
 NoNewPrivileges=true
 ProtectHome=read-only
-ProtectSystem=strict
+ProtectSystem=full
 
 [Install]
 WantedBy=multi-user.target

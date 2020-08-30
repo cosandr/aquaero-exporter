@@ -27,22 +27,21 @@ pkgver() {
 build() {
     git clone https://github.com/shred/pyquaero pyquaero
     cd pyquaero
-    /usr/bin/python setup.py build
+    /usr/bin/python3 setup.py build
     cd "../${_pkgname}"
-    /usr/bin/python setup.py build
+    /usr/bin/python3 setup.py build
     ./setup.sh systemd-unit \
         --pkg-name "${_pkgname}" \
         --systemd-path . \
-        --bin-path /usr/bin/aquaero_exporter \
-        --py-path /usr/bin/python
+        --exec-cmd "/usr/bin/${_pkgname}"
 }
 
 package() {
     cd pyquaero
-    /usr/bin/python setup.py install --root="$pkgdir" --optimize=1 --skip-build
+    /usr/bin/python3 setup.py install --root="$pkgdir" --optimize=1 --skip-build
     cd "../${_pkgname}"
     install -d "${pkgdir}/usr/lib/systemd/system"
-    /usr/bin/python setup.py install --root="$pkgdir" --optimize=1 --skip-build
+    /usr/bin/python3 setup.py install --root="$pkgdir" --optimize=1 --skip-build
     install -m 644 "${_pkgname}.service" "${pkgdir}/usr/lib/systemd/system/"
     install -Dm 644 LICENSE "${pkgdir}/usr/share/licenses/${_pkgname}/LICENSE"
 }
