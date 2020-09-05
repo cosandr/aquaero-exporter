@@ -1,12 +1,15 @@
 import argparse
-import os
-from typing import Dict, NamedTuple, List
+import json
+import logging
+from datetime import datetime
+from typing import Dict, NamedTuple, List, Optional
 
-import prometheus_client as prom
 from aiohttp import web
+from prometheus_client import generate_latest
+from prometheus_client.core import GaugeMetricFamily, REGISTRY
 from pyquaero.core import Aquaero
 
-WRITE_FILE = ''
+NAMESPACE = 'aquaero'
 
 
 class Status(NamedTuple):
@@ -15,85 +18,134 @@ class Status(NamedTuple):
 
 
 class Exporter:
-    def __init__(self):
-        self.aq = Aquaero()
-        print('Aquaero device opened')
-        self.gauges: Dict[str, prom.Gauge] = {
-            "aquaero_up": prom.Gauge("aquaero_up", "Aquaero exporter running"),
-            "aquaero_rpm": prom.Gauge("aquaero_rpm", "Aquaero fan RPM", ['id']),
-            "aquaero_temp": prom.Gauge("aquaero_temp", "Aquaero temperature sensor", ['id']),
+    def __init__(self, device, wait_seconds=30, write_file=''):
+        self.wait_seconds: int = wait_seconds
+        self.write_file: str = write_file
+        if self.write_file:
+            logging.info(f'Write status to {self.write_file}')
+        self._last_read: Optional[datetime] = None
+        self._last_status = dict()
+        self.metrics: Dict[str, dict] = {
+            "up": dict(name=f"{NAMESPACE}_up", documentation="Aquaero exporter running", value=1),
+            "rpm": dict(name=f"{NAMESPACE}_rpm", documentation="Aquaero fan RPM", labels=['id']),
+            "temp": dict(name=f"{NAMESPACE}_temp", documentation="Aquaero temperature sensor", labels=['id']),
         }
-        self.gauges["aquaero_up"].set(1)
+        self._last_metrics = {}
+        self.device = device
+        REGISTRY.register(self)
+        self.routes = [
+            web.get("/", self.handler_root),
+            web.get("/metrics", self.handler_metrics),
+            web.get("/api/status", self.handler_api_status),
+        ]
 
     def close(self):
-        self.aq.close()
-        print('Aquaero device closed')
+        self.device.close()
+        logging.info('Device closed')
 
-    def read_status_aquaero(self) -> dict:
-        return self.aq.get_status()
-
-    def parse_status(self, status: dict) -> Dict[str, List[Status]]:
-        res = {k: [] for k in self.gauges.keys()}
-        for k, v in status.items():
-            if k == 'fans':
-                if not isinstance(v, list):
-                    print(f'Expected type list for fans, got {type(v)}')
-                    continue
-                for i, fan in enumerate(v, 1):
-                    if not isinstance(fan, dict):
-                        print(f'Expected type dict for fan entry, got {type(fan)}')
-                        break
-                    if fan.get('speed') is not None:
-                        res['aquaero_rpm'].append(Status(id=f'fan{i}', val=fan['speed']))
-            if k == 'temperatures':
-                if not isinstance(v, dict):
-                    print(f'Expected type dict for temperatures, got {type(v)}')
-                    continue
-                for name, entries in v.items():
-                    for i, sensor in enumerate(entries, 1):
-                        if not isinstance(sensor, dict):
-                            print(f'Expected type dict for {name}, got {type(sensor)}')
-                            break
-                        if sensor.get('temp') is not None:
-                            res['aquaero_temp'].append(Status(id=f'{name}{i}', val=sensor['temp']))
-        return res
-
-    def update_gauges(self, status: Dict[str, List[Status]]):
+    def collect(self):
+        status = self.get_status()
+        gauges = {}
+        for k, v in self.metrics.items():
+            gauges[k] = GaugeMetricFamily(**v)
         for k, s_list in status.items():
+            if 'labels' not in self.metrics[k]:
+                continue
             for s in s_list:
                 try:
-                    self.gauges[k].labels(id=s.id).set(s.val)
+                    gauges[k].add_metric(labels=[s.id], value=s.val)
                 except Exception as e:
-                    print(f'Failed to set gauge {k} to {s.val}: {str(e)}')
+                    logging.error('Failed to set gauge %s to %s: %s', k, s.val, str(e))
+        for v in gauges.values():
+            yield v
 
-    async def handler_metrics(self, r: web.Request) -> web.Response:
+    def read_status_aquaero(self) -> dict:
+        if not self._last_read or (datetime.now() - self._last_read).total_seconds() > self.wait_seconds:
+            status = self.device.get_status()
+            self._last_read = datetime.now()
+            self._last_status = status
+            logging.debug('Read new status from device')
+        else:
+            status = self._last_status
+            logging.debug('Returning cached status')
+        return status
+
+    def parse_status(self, status: dict) -> Dict[str, List[Status]]:
+        res = {k: [] for k, v in self.metrics.items() if 'labels' in v}
+        # Fans
+        for i, fan in enumerate(status.get('fans', []), 1):
+            if not isinstance(fan, dict):
+                logging.warning('Expected type dict for fan entry, got %s', type(fan))
+                break
+            if fan.get('speed') is not None:
+                res['rpm'].append(Status(id=f'fan{i}', val=fan['speed']))
+        # Temperatures
+        for name, entries in status.get('temperatures', {}).items():
+            for i, sensor in enumerate(entries, 1):
+                if not isinstance(sensor, dict):
+                    logging.warning('Expected type dict for %s, got %s', name, type(sensor))
+                    break
+                if sensor.get('temp') is not None:
+                    res['temp'].append(Status(id=f'{name}{i}', val=sensor['temp']))
+        return res
+
+    def get_status(self) -> Dict[str, List[Status]]:
         status = self.parse_status(self.read_status_aquaero())
-        self.update_gauges(status)
-        if WRITE_FILE:
+        if self.write_file:
+            write_str = ''
+            for s_list in status.values():
+                tmp = [f'{s.id}\t{s.val}' for s in s_list]
+                write_str += f'{"|".join(tmp)}\n'
             try:
-                write_str = ''
-                for s_list in status.values():
-                    tmp = [f'{s.id}\t{s.val}' for s in s_list]
-                    write_str += f'{"|".join(tmp)}\n'
-                with open(WRITE_FILE, 'w') as f:
+                with open(self.write_file, 'w') as f:
                     f.write(write_str.strip())
             except Exception as e:
-                print(f'Cannot write to {WRITE_FILE}: {e}')
-        return web.Response(body=prom.generate_latest(prom.REGISTRY), content_type="text/plain")
+                logging.error('Cannot write to %s: %s', self.write_file, str(e))
+        return status
+
+    async def handler_root(self, r: web.Request) -> web.Response:
+        return web.Response(text="""
+            <html>
+            <head><title>Aquaero Exporter</title></head>
+            <body>
+            <h1>Aquaero Exporter</h1>
+            <p><a href='/metrics'>Metrics</a></p>
+            <p><a href='/api/status'>API</a></p>
+            <h2>More information:</h2>
+            <p><a href="https://github.com/cosandr/aquaero-exporter">github.com/cosandr/aquaero-exporter</a></p>
+            </body>
+            </html>
+            """, content_type="text/html")
+
+    async def handler_metrics(self, r: web.Request) -> web.Response:
+        return web.Response(body=generate_latest(REGISTRY), content_type="text/plain")
+
+    async def handler_api_status(self, r: web.Request) -> web.Response:
+        status = self.get_status()
+        status_dict = {}
+        for k, v in status.items():
+            if isinstance(v, list):
+                status_dict[k] = {}
+                for s in v:
+                    if isinstance(s, Status):
+                        status_dict[k][s.id] = s.val
+        return web.Response(text=json.dumps(status_dict), content_type="application/json")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Prometheus exporter for Aquaero devices")
     parser.add_argument('--listen-address', type=str, default='0.0.0.0:2782', help='Listen address')
     parser.add_argument('--file', type=str, help='Write script-friendly output to file')
+    parser.add_argument('--throttle', type=int, default=30, help='Time to cache data for in seconds')
+    parser.add_argument('--log-level', type=str.upper, choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
+                        default='WARNING', help='Time to cache data for in seconds')
     args = parser.parse_args()
-    if args.file:
-        global WRITE_FILE
-        WRITE_FILE = args.file
-        print(f'Write status to {WRITE_FILE}')
-    exp = Exporter()
+    logging.basicConfig(level=args.log_level)
+    device = Aquaero()
+    logging.info('Device opened')
+    exp = Exporter(device, wait_seconds=args.throttle, write_file=args.file)
     app = web.Application()
-    app.add_routes([web.get("/metrics", exp.handler_metrics)])
+    app.add_routes(exp.routes)
     try:
         host, port = args.listen_address.split(':', 1)
         web.run_app(app, host=host, port=int(port))
