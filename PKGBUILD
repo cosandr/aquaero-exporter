@@ -31,6 +31,7 @@ build() {
     cd "../${_pkgname}"
     /usr/bin/python3 setup.py build
     ./setup.sh systemd-unit \
+        --no-check-exec \
         --pkg-name "${_pkgname}" \
         --systemd-path . \
         --exec-cmd "/usr/bin/${_pkgname}"
