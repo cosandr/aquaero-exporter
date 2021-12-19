@@ -7,7 +7,6 @@ from typing import Dict, NamedTuple, List, Optional
 from aiohttp import web
 from prometheus_client import generate_latest
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
-from pyquaero.core import Aquaero
 
 NAMESPACE = 'aquaero'
 
@@ -139,10 +138,17 @@ def main():
     parser.add_argument('--throttle', type=int, default=30, help='Time to cache data for in seconds')
     parser.add_argument('--log-level', type=str.upper, choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
                         default='WARNING', help='Time to cache data for in seconds')
+    parser.add_argument('--quadro', action='store_true', help='Use a Quadro device')
     args = parser.parse_args()
     logging.basicConfig(level=args.log_level)
-    device = Aquaero()
-    logging.info('Device opened')
+    if args.quadro:
+        from pyquaero.quadro.core import Quadro
+        device = Quadro()
+        logging.info('Quadro device opened')
+    else:
+        from pyquaero.core import Aquaero
+        device = Aquaero()
+        logging.info('Aquaero device opened')
     exp = Exporter(device, wait_seconds=args.throttle, write_file=args.file)
     app = web.Application()
     app.add_routes(exp.routes)

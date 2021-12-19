@@ -25,15 +25,17 @@ pkgver() {
 }
 
 build() {
-    git clone https://github.com/shred/pyquaero pyquaero
+    git clone https://github.com/cosandr/pyquaero pyquaero
     cd pyquaero
+    git checkout quadro
     /usr/bin/python3 setup.py build
     cd "../${_pkgname}"
     /usr/bin/python3 setup.py build
     ./setup.sh systemd-unit \
         --pkg-name "${_pkgname}" \
         --systemd-path . \
-        --exec-cmd "/usr/bin/${_pkgname}"
+        --exec-cmd "/usr/bin/${_pkgname}" \
+        --quadro
 }
 
 package() {
