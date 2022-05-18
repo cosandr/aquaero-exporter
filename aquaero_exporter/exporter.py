@@ -29,6 +29,8 @@ class Exporter:
             "up": dict(name=f"{NAMESPACE}_up", documentation="Aquaero exporter running", value=1),
             "rpm": dict(name=f"{NAMESPACE}_rpm", documentation="Aquaero fan RPM", labels=['id']),
             "temp": dict(name=f"{NAMESPACE}_temp", documentation="Aquaero temperature sensor", labels=['id']),
+            "flow": dict(name=f"{NAMESPACE}_flow", documentation="Aquaero flow meters", labels=['id']),
+            "aquastream": dict(name=f"{NAMESPACE}_aquastream", documentation="Aquaero aquastream speed", labels=['id']),
         }
         self._last_metrics = {}
         self.device = device
@@ -87,6 +89,21 @@ class Exporter:
                     break
                 if sensor.get('temp') is not None:
                     res['temp'].append(Status(id=f'{name}{i}', val=sensor['temp']))
+        # Flow meters
+        for i, flow in enumerate(status.get('flow_meters', []), 1):
+            if not isinstance(flow, dict):
+                logging.warning('Expected type dict for flow entry, got %s', type(flow))
+                break
+            if flow.get('rate') is not None:
+                res['flow'].append(Status(id=f'flow{i}', val=flow['rate']))
+        # Aquastream speeds
+        for i, stream in enumerate(status.get('aquastream', []), 1):
+            if not isinstance(stream, dict):
+                logging.warning('Expected type dict for aquastream entry, got %s', type(stream))
+                break
+            if stream.get('speed') is not None:
+                res['aquastream'].append(Status(id=f'aquastream{i}', val=stream['speed']))
+
         return res
 
     def get_status(self) -> Dict[str, List[Status]]:
