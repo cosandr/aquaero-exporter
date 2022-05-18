@@ -30,7 +30,6 @@ class Exporter:
             "rpm": dict(name=f"{NAMESPACE}_rpm", documentation="Aquaero fan RPM", labels=['id']),
             "temp": dict(name=f"{NAMESPACE}_temp", documentation="Aquaero temperature sensor", labels=['id']),
             "flow": dict(name=f"{NAMESPACE}_flow", documentation="Aquaero flow meters", labels=['id']),
-            "aquastream": dict(name=f"{NAMESPACE}_aquastream", documentation="Aquaero aquastream speed", labels=['id']),
         }
         self._last_metrics = {}
         self.device = device
@@ -102,7 +101,7 @@ class Exporter:
                 logging.warning('Expected type dict for aquastream entry, got %s', type(stream))
                 break
             if stream.get('speed') is not None:
-                res['aquastream'].append(Status(id=f'aquastream{i}', val=stream['speed']))
+                res['rpm'].append(Status(id=f'aquastream{i}', val=stream['speed']))
 
         return res
 
