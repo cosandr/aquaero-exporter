@@ -9,7 +9,7 @@ if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
 fi
 
 OPTIONS=h
-LONGOPTS=help,pkg-name:,listen-address:,systemd-path:,exec-cmd:,quadro
+LONGOPTS=help,no-check-exec,pkg-name:,listen-address:,systemd-path:,exec-cmd:
 
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -26,6 +26,7 @@ EXTRA_ARGS=""
 LISTEN_ADDRESS="0.0.0.0:2782"
 PKG_NAME="aquaero-exporter"
 SYSTEMD_PATH="/usr/lib/systemd/system"
+CHECK_EXEC=1
 
 set +e
 if command -v pyenv > /dev/null 2>&1; then
@@ -49,6 +50,7 @@ systemd-unit          Create and install systemd service file
 
 Options:
 -h    --help            Show this message
+      --no-check-exec   Don't check whether exec exists or not
       --exec-cmd        Override systemd exec (default $EXEC_CMD)
       --listen-address  Listen address (default $LISTEN_ADDRESS)
       --pkg-name        Change package name (default $PKG_NAME)
@@ -62,6 +64,10 @@ while true; do
         -h|--help)
             print_help
             exit 0
+            ;;
+        --no-check-exec)
+            CHECK_EXEC=0
+            shift
             ;;
         --exec-cmd)
             EXEC_CMD="$2"
@@ -116,7 +122,7 @@ case "$CMD" in
         makepkg --noextract
         ;;
     systemd-unit)
-        if ! eval "$EXEC_CMD" --help > /dev/null; then
+        if [[ $CHECK_EXEC -eq 1 ]] && ! eval "$EXEC_CMD" --help > /dev/null; then
             echo "Cannot run $EXEC_CMD"
             exit 1
         fi
